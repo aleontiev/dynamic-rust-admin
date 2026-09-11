@@ -1,0 +1,86 @@
+{
+  "name": "dynamic-rust-admin",
+  "version": "0.1.0",
+  "description": "Configurable Vue and Quasar admin library for dynamic REST APIs",
+  "productName": "Dynamic Rust Admin",
+  "author": "alonetiev@gmail.com",
+  "private": false,
+  "scripts": {
+    "lint": "eslint --ext .js,.vue ./",
+    "format": "prettier --write \"**/*.{js,vue,scss,html,md,json}\" --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.3.67",
+    "@quasar/extras": "1.16.12",
+    "@videojs-player/vue": "^1.0.0",
+    "@vueup/vue-quill": "^1.2.0",
+    "@vueuse/head": "^0.7.8",
+    "@vuex-orm/core": "^0.36.4",
+    "apexcharts": "3.48.0",
+    "aws-sdk": "^2.1472.0",
+    "axios": "^0.26.1",
+    "core-js": "^3.6.5",
+    "date-fns": "^2.28.0",
+    "json-to-pretty-yaml": "^1.2.2",
+    "marked": "^18.0.7",
+    "uuid": "^8.3.2",
+    "video.js": "^8.10.0",
+    "vue-draggable-next": "^2.1.1",
+    "vue-pdf-embed": "^1.1.5",
+    "vue3-apexcharts": "^1.5.2",
+    "vue3-dropzone": "^2.2.1",
+    "vue3-openlayers": "^10.0.1",
+    "vue3-resize-text": "^0.1.0",
+    "vuex-persistedstate": "^4.1.0"
+  },
+  "devDependencies": {
+    "@babel/eslint-parser": "^7.13.14",
+    "@quasar/app": "^3.0.0",
+    "eslint": "^7.14.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-vue": "^9.19.2",
+    "eslint-webpack-plugin": "^2.4.0",
+    "prettier": "^2.5.1"
+  },
+  "browserslist": [
+    "last 10 Chrome versions",
+    "last 10 Firefox versions",
+    "last 4 Edge versions",
+    "last 7 Safari versions",
+    "last 8 Android versions",
+    "last 8 ChromeAndroid versions",
+    "last 8 FirefoxAndroid versions",
+    "last 10 iOS versions",
+    "last 5 Opera versions"
+  ],
+  "engines": {
+    "node": ">= 22",
+    "npm": ">= 6.13.4",
+    "yarn": ">= 1.21.1"
+  },
+  "main": "index.js",
+  "module": "index.js",
+  "files": [
+    "src",
+    "index.js",
+    "quasar.conf.js",
+    "babel.config.js",
+    ".postcssrc.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "vue": "3.2.31",
+    "quasar": "^2.11.7",
+    "vue-router": "^4.0.0",
+    "vuex": "^4.0.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aleontiev/dynamic-rust-admin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aleontiev/dynamic-rust-admin/issues"
+  }
+}
