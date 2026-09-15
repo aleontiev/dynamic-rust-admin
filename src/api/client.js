@@ -150,6 +150,16 @@ export async function request(method, base, endpoint, rest = {}) {
     })
     .catch((error) => {
       logError(base, error);
+      // An expired or missing session answers with a JSON 401 here rather than
+      // the redirect to /login/ that Dynamic REST replied with, so the redirect
+      // above never fires and the caller is left showing an "Authentication
+      // credentials were not provided" dialog it cannot act on. End the session
+      // instead, which clears local state and sends the browser to the login
+      // page with the current URL as `next`. OPTIONS still rejects, so
+      // isAuthenticated() can probe the session without navigating away.
+      if (method !== "options" && error?.response?.status === 401) {
+        return client.logout();
+      }
       return processError(error);
     });
 }
