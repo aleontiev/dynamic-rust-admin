@@ -74,7 +74,17 @@
         'row justify-center': focused && isVideo,
       }"
     >
-      <div v-if="field.type === 'filters'" class="FieldInput__filters">
+      <div v-if="field.type === 'permissions'" class="FieldInput__permissions">
+        <PermissionsEditor
+          :value="live"
+          :field="field"
+          :dark="dark"
+          :dense="dense"
+          :readonly="readonly"
+          @update="onPermissionsUpdate"
+        />
+      </div>
+      <div v-else-if="field.type === 'filters'" class="FieldInput__filters">
         <FilterList
           :hasPrevious="true"
           v-if="referencedResource"
@@ -319,9 +329,16 @@ import "@vueup/vue-quill/dist/vue-quill.snow.css";
 
 import VuePdfEmbed from "vue-pdf-embed";
 import FilterList from "./FilterList";
+import PermissionsEditor from "./PermissionsEditor";
 
 export default {
-  components: { VuePdfEmbed, FilterList, VideoPlayer, QuillEditor },
+  components: {
+    VuePdfEmbed,
+    FilterList,
+    PermissionsEditor,
+    VideoPlayer,
+    QuillEditor,
+  },
   props: [
     "dark",
     "record",
@@ -667,6 +684,10 @@ export default {
       }
       return false;
     });
+    const onPermissionsUpdate = (value) => {
+      live.value = value;
+      doUpdate(value);
+    };
     const onFilterAdd = () => {
       if (Array.isArray(live.value)) {
         live.value.push({});
@@ -739,6 +760,7 @@ export default {
       liveFile,
       isPdf,
       isVideo,
+      onPermissionsUpdate,
       onFilterAdd,
       onFilterUpdate,
       onFilterDelete,

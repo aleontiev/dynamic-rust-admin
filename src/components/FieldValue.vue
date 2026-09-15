@@ -24,6 +24,12 @@
   <div v-else-if="field.type === 'resources'">
     {{ display }}
   </div>
+  <div v-else-if="field.type === 'permissions'" class="FieldValue__permissions">
+    <div v-for="line in permissionLines" :key="line.resource">
+      <span class="text-weight-medium">{{ line.resource }}</span>: {{ line.rules }}
+    </div>
+    <span v-if="!permissionLines.length" class="text-grey">No access</span>
+  </div>
   <div v-else-if="isMediaField">
     <MediaPreview
       :value="value"
@@ -146,7 +152,21 @@ export default {
       return base;
     });
 
+    const permissionLines = computed(() => {
+      if (props.field.type !== 'permissions' || !props.value || typeof props.value !== 'object') {
+        return [];
+      }
+      const offered = props.field.resources || {};
+      return Object.entries(props.value).map(([name, rules]) => ({
+        resource: (offered[name] && offered[name].label) || name,
+        rules: Object.entries(rules || {})
+          .filter(([, rule]) => rule === true || (rule && typeof rule === 'object'))
+          .map(([operation, rule]) => (rule === true ? operation : `${operation} (when…)`))
+          .join(', '),
+      })).filter((line) => line.rules);
+    });
     return {
+      permissionLines,
       maxHeight,
       display,
       chartOptions,

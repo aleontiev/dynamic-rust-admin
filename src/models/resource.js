@@ -1473,7 +1473,16 @@ class Resource extends Model {
           }
           break;
         case "list":
-          result = value ? value.join("\n") : value;
+          result = value
+            ? value
+                .map((item) => {
+                  const choice = (field.choices || []).find(
+                    (option) => option.id === item
+                  );
+                  return choice ? choice.label : item;
+                })
+                .join("\n")
+            : value;
           break;
         case "resources":
           result = value
