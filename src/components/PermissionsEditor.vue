@@ -99,12 +99,15 @@
                     options-dense
                     :label="condition.field ? '' : 'Choose a field'"
                     :options="fieldOptions(entry.name)"
-                    :model-value="fieldOption(entry.name, condition.field)"
+                    :model-value="condition.field"
                     @update:model-value="
-                      setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                        field: $event ? $event.value : null,
-                        value: condition.value,
-                      })
+                      setCondition(
+                        entry.name,
+                        operation,
+                        groupIndex,
+                        conditionIndex,
+                        withField(entry.name, condition, $event)
+                      )
                     "
                     :readonly="readonly"
                     emit-value
@@ -121,10 +124,94 @@
                       </q-item>
                     </template>
                   </q-select>
-                  <span class="PermissionsEditor__equals">=</span>
+                  <q-select
+                    class="PermissionsEditor__operator"
+                    behavior="menu"
+                    :dark="dark"
+                    dense
+                    options-dense
+                    :options="operatorOptions(entry.name, condition.field)"
+                    :model-value="condition.operator || 'exact'"
+                    @update:model-value="
+                      setCondition(
+                        entry.name,
+                        operation,
+                        groupIndex,
+                        conditionIndex,
+                        withOperator(condition, $event)
+                      )
+                    "
+                    :readonly="readonly"
+                    emit-value
+                    map-options
+                  >
+                    <template v-slot:selected-item="scope">
+                      <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
+                    </template>
+                    <template v-slot:option="scope">
+                      <q-item v-bind="scope.itemProps">
+                        <q-item-section avatar>
+                          <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label>{{ scope.opt.label }}</q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <div class="col">
+                    <q-toggle
+                      v-if="condition.operator === 'isnull'"
+                      :dark="dark"
+                      dense
+                      :model-value="condition.value !== false"
+                      :label="condition.value !== false ? 'is empty' : 'is not empty'"
+                      @update:model-value="
+                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                          ...condition,
+                          value: $event,
+                        })
+                      "
+                      :disable="readonly"
+                    />
                     <q-select
-                      v-if="condition.value === USER_ID"
+                      v-else-if="condition.operator === 'in'"
+                      :dark="dark"
+                      dense
+                      multiple
+                      use-chips
+                      use-input
+                      hide-dropdown-icon
+                      new-value-mode="add-unique"
+                      input-debounce="0"
+                      :options="[]"
+                      :model-value="listValue(condition.value)"
+                      @update:model-value="
+                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                          ...condition,
+                          value: $event.map((item) =>
+                            item === USER_ID ? item : typedValue(entry.name, condition.field, item)
+                          ),
+                        })
+                      "
+                      :readonly="readonly"
+                      placeholder="Type a value and press Enter"
+                    >
+                      <template v-slot:selected-item="scope">
+                        <q-chip
+                          removable
+                          dense
+                          :dark="dark"
+                          :tabindex="scope.tabindex"
+                          @remove="scope.removeAtIndex(scope.index)"
+                          :icon="scope.opt === USER_ID ? 'mdi-account-circle-outline' : undefined"
+                        >
+                          {{ scope.opt === USER_ID ? "the signed-in user" : scope.opt }}
+                        </q-chip>
+                      </template>
+                    </q-select>
+                    <q-select
+                      v-else-if="condition.value === USER_ID"
                       :dark="dark"
                       dense
                       readonly
@@ -143,7 +230,7 @@
                       :label="condition.value === true ? 'yes' : 'no'"
                       @update:model-value="
                         setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          field: condition.field,
+                          ...condition,
                           value: $event,
                         })
                       "
@@ -153,11 +240,15 @@
                       v-else
                       :dark="dark"
                       dense
-                      :type="isNumeric(entry.name, condition.field) ? 'number' : 'text'"
+                      :type="
+                        isNumeric(entry.name, condition.field) && condition.operator !== 'icontains'
+                          ? 'number'
+                          : 'text'
+                      "
                       :model-value="condition.value === null ? '' : condition.value"
                       @update:model-value="
                         setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          field: condition.field,
+                          ...condition,
                           value: typedValue(entry.name, condition.field, $event),
                         })
                       "
@@ -166,21 +257,24 @@
                     />
                   </div>
                   <q-btn
-                    v-if="!readonly"
+                    v-if="!readonly && userReferenceAllowed(condition)"
                     flat
                     round
                     dense
                     size="0.75rem"
                     :dark="dark"
                     :icon="
-                      condition.value === USER_ID ? 'mdi-account-circle' : 'mdi-account-circle-outline'
+                      usesUser(condition) ? 'mdi-account-circle' : 'mdi-account-circle-outline'
                     "
-                    :color="condition.value === USER_ID ? 'primary' : 'grey-7'"
+                    :color="usesUser(condition) ? 'primary' : 'grey-7'"
                     @click="
-                      setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                        field: condition.field,
-                        value: condition.value === USER_ID ? null : USER_ID,
-                      })
+                      setCondition(
+                        entry.name,
+                        operation,
+                        groupIndex,
+                        conditionIndex,
+                        toggleUser(condition)
+                      )
                     "
                   >
                     <q-tooltip>Compare with the signed-in user's id</q-tooltip>
@@ -247,6 +341,28 @@ import { useStore } from "vuex";
 
 export const OPERATIONS = ["list", "read", "create", "update", "delete"];
 export const USER_ID = "$user.id";
+export const CONDITION_OPERATORS = [
+  { value: "exact", label: "is", symbol: "=" },
+  { value: "in", label: "is one of", symbol: "∋" },
+  { value: "icontains", label: "contains", symbol: "≈" },
+  { value: "gt", label: "is greater than", symbol: ">" },
+  { value: "gte", label: "is at least", symbol: "≥" },
+  { value: "lt", label: "is less than", symbol: "<" },
+  { value: "lte", label: "is at most", symbol: "≤" },
+  { value: "isnull", label: "is empty", symbol: "∅" },
+];
+const OPERATOR_NAMES = CONDITION_OPERATORS.map((operator) => operator.value);
+
+// A lookup is a field name with an optional __operator suffix.
+const splitLookup = (lookup) => {
+  const index = lookup.lastIndexOf("__");
+  if (index > 0 && OPERATOR_NAMES.indexOf(lookup.substr(index + 2)) !== -1) {
+    return { field: lookup.substr(0, index), operator: lookup.substr(index + 2) };
+  }
+  return { field: lookup, operator: "exact" };
+};
+const joinLookup = ({ field, operator }) =>
+  !operator || operator === "exact" ? field : `${field}__${operator}`;
 
 const OPERATION_ICONS = {
   list: "mdi-format-list-bulleted",
@@ -268,10 +384,13 @@ const toGroups = (rule) => {
   if (rule === true || rule === false || rule === null || rule === undefined) {
     return [];
   }
+  const conditions = (object) =>
+    Object.entries(object).map(([lookup, value]) => ({
+      ...splitLookup(lookup),
+      value,
+    }));
   if (isPlainCondition(rule)) {
-    return [
-      Object.entries(rule).map(([field, value]) => ({ field, value })),
-    ];
+    return [conditions(rule)];
   }
   if (
     rule &&
@@ -280,18 +399,17 @@ const toGroups = (rule) => {
     Array.isArray(rule.$or) &&
     rule.$or.every(isPlainCondition)
   ) {
-    return rule.$or.map((group) =>
-      Object.entries(group).map(([field, value]) => ({ field, value }))
-    );
+    return rule.$or.map(conditions);
   }
   return null;
 };
 
 const fromGroups = (groups) => {
   const objects = groups.map((group) =>
-    group.reduce((acc, { field, value }) => {
-      if (field) {
-        acc[field] = value === undefined ? null : value;
+    group.reduce((acc, condition) => {
+      if (condition.field) {
+        acc[joinLookup(condition)] =
+          condition.value === undefined ? null : condition.value;
       }
       return acc;
     }, {})
@@ -403,8 +521,12 @@ export default {
       const options = fieldOptions(name);
       return options.length ? options[0].value : "id";
     };
-    const fieldOption = (name, field) =>
-      fieldOptions(name).find((option) => option.value === field) || null;
+    // Changing the field keeps the operator when the new field supports it.
+    const withField = (name, condition, field) => {
+      const allowed = operatorOptions(name, field).map((option) => option.value);
+      const operator = allowed.indexOf(condition.operator || "exact") !== -1 ? condition.operator : "exact";
+      return withOperator({ ...condition, field }, operator || "exact");
+    };
     const fieldType = (name, field) => {
       const resource = Resource.find(name);
       const meta = resource && field ? resource.fields[field] : null;
@@ -421,6 +543,53 @@ export default {
         return Number.isNaN(number) ? input : number;
       }
       return input;
+    };
+    const operatorOptions = (name, field) => {
+      const type = fieldType(name, field);
+      return CONDITION_OPERATORS.filter((operator) => {
+        if (type === "boolean") {
+          return ["exact", "isnull"].indexOf(operator.value) !== -1;
+        }
+        if (isNumeric(name, field)) {
+          return operator.value !== "icontains";
+        }
+        return true;
+      });
+    };
+    const listValue = (value) =>
+      Array.isArray(value) ? value : value === null || value === undefined ? [] : [value];
+    // Keep what carries over when the operator changes: a list becomes its
+    // first value and back, and emptiness tests start as "is empty".
+    const withOperator = (condition, operator) => {
+      let value = condition.value;
+      if (operator === "isnull") {
+        value = true;
+      } else if (operator === "in") {
+        value = listValue(condition.operator === "isnull" ? null : value);
+      } else if (condition.operator === "in") {
+        value = listValue(value)[0] === undefined ? null : listValue(value)[0];
+      } else if (condition.operator === "isnull") {
+        value = null;
+      }
+      return { ...condition, operator, value };
+    };
+    const userReferenceAllowed = (condition) =>
+      ["exact", "in"].indexOf(condition.operator || "exact") !== -1;
+    const usesUser = (condition) =>
+      condition.operator === "in"
+        ? listValue(condition.value).indexOf(USER_ID) !== -1
+        : condition.value === USER_ID;
+    const toggleUser = (condition) => {
+      if (condition.operator === "in") {
+        const items = listValue(condition.value);
+        return {
+          ...condition,
+          value: usesUser(condition)
+            ? items.filter((item) => item !== USER_ID)
+            : [...items, USER_ID],
+        };
+      }
+      return { ...condition, value: usesUser(condition) ? null : USER_ID };
     };
     const groups = (name, operation) => toGroups(rule(name, operation)) || [];
     const editableGroups = (name, operation) =>
@@ -486,10 +655,16 @@ export default {
       setKind,
       operationIcon: (operation) => OPERATION_ICONS[operation],
       fieldOptions,
-      fieldOption,
+      withField,
       fieldType,
       isNumeric,
       typedValue,
+      operatorOptions,
+      listValue,
+      withOperator,
+      userReferenceAllowed,
+      usesUser,
+      toggleUser,
       groups,
       editableGroups,
       setCondition,
@@ -535,9 +710,15 @@ export default {
       background-color: $grey-7;
     }
   }
-  .PermissionsEditor__equals {
-    padding: 0 8px;
-    color: $grey-7;
+  .PermissionsEditor__operator {
+    width: 64px;
+    margin: 0 8px;
+  }
+  .PermissionsEditor__symbol {
+    display: inline-block;
+    min-width: 24px;
+    text-align: center;
+    font-size: 1.1em;
   }
   .q-chip {
     margin: 0 4px 0 0;
