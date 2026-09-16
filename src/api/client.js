@@ -124,6 +124,17 @@ export function buildIsAuthenticated(base) {
  * @returns {Promise}
  * @see https://github.com/axios/axios
  */
+// A session that has ended is ended once: every request that learns of it joins
+// the same sign-out and never settles, since the page is on its way to sign-in
+// and nothing should show an error it cannot act on.
+let ending = null;
+function endSession() {
+  if (!ending) {
+    ending = client.logout();
+  }
+  return new Promise(() => {});
+}
+
 export async function request(method, base, endpoint, rest = {}) {
   const url = getEndpointUrl(base, endpoint, rest.params);
   const config = {
@@ -137,13 +148,11 @@ export async function request(method, base, endpoint, rest = {}) {
     .request(config)
     .then((response) => {
       if (
-        method !== "options" &&
         response.request.responseURL !== url &&
         response.request.responseURL.indexOf("/login") >= 0
       ) {
         // autologout when redirected to a login page
-        // except for options requests
-        return client.logout();
+        return endSession();
       }
       logSuccess(base, response);
       return processResponse(response);
@@ -152,13 +161,14 @@ export async function request(method, base, endpoint, rest = {}) {
       logError(base, error);
       // An expired or missing session answers with a JSON 401 here rather than
       // the redirect to /login/ that Dynamic REST replied with, so the redirect
-      // above never fires and the caller is left showing an "Authentication
+      // above never fires and the caller would show an "Authentication
       // credentials were not provided" dialog it cannot act on. End the session
-      // instead, which clears local state and sends the browser to the login
-      // page with the current URL as `next`. OPTIONS still rejects, so
-      // isAuthenticated() can probe the session without navigating away.
-      if (method !== "options" && error?.response?.status === 401) {
-        return client.logout();
+      // instead, whatever the method: it clears local state and sends the
+      // browser to the login page with the current URL as `next`. (The
+      // isAuthenticated() probe is an OPTIONS request; a 401 there ends the
+      // session too, which is where a failed probe was headed anyway.)
+      if (error?.response?.status === 401) {
+        return endSession();
       }
       return processError(error);
     });
