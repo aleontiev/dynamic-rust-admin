@@ -82,6 +82,8 @@ const columnCreator = (resource) => (k) => {
     related: metadata.related,
     reference: metadata.reference,
     resource_field: metadata.resource_field,
+    // Permission fields carry the resources their rules may name.
+    resources: metadata.resources,
     extra: metadata.extra,
     dynamic: metadata.dynamic,
     resource,
