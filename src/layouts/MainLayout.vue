@@ -162,6 +162,29 @@
             aria-label="copilot button"
             @click="showCopilotDialog = true"
           />
+          <template v-if="!searching && !dense">
+            <q-btn
+              flat
+              dense
+              round
+              :icon="dark ? 'light_mode' : 'dark_mode'"
+              class="q-mr-sm"
+              :aria-label="dark ? 'Switch to light mode' : 'Switch to dark mode'"
+              :title="dark ? 'Light mode' : 'Dark mode'"
+              @click="toggleTheme"
+            />
+            <q-btn
+              v-if="helpEnabled"
+              flat
+              dense
+              round
+              icon="help_outline"
+              class="q-mr-sm"
+              aria-label="Help"
+              title="Help"
+              @click="openHelp"
+            />
+          </template>
           <UserDropdown
             :application="application"
             v-if="!searching"
@@ -252,6 +275,21 @@
       <q-list
         :class="{ 'q-pt-xl': true, 'bg-black': dark, 'bg-grey-1': !dark }"
       >
+        <q-item
+          to="/"
+          exact
+          clickable
+          v-ripple
+          class="drawer-home"
+          :class="{ 'bg-black text-white': dark, 'text-h8': true, active: route.path === '/' }"
+        >
+          <q-item-section side>
+            <q-icon name="home" :color="route.path === '/' ? 'primary' : textColor" />
+          </q-item-section>
+          <q-item-section>
+            <span :class="{ 'q-item__title': true, dark: dark }">Home</span>
+          </q-item-section>
+        </q-item>
         <q-expansion-item
           :dark="dark"
           expand-separator
@@ -316,7 +354,7 @@ import { useQuasar, setCssVar } from "quasar";
 import { onMounted, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import { BRAND, COPILOT_URL } from "../config";
+import { BRAND, COPILOT_URL, FEATURES } from "../config";
 import { buildAdd } from "../utilities";
 import {
   SearchResult,
@@ -688,6 +726,15 @@ export default defineComponent({
     };
     const home = () =>
       route.path === "/" ? (leftDrawerOpen.value = false) : router.push("/");
+    // On a desktop the theme switch and help live in the header as icons; the
+    // account menu keeps guides, profile and logout.
+    const openHelp = () => {
+      router.replace({
+        name: route.name,
+        path: route.path,
+        query: { ...route.query, help: 1 },
+      });
+    };
     const getResourceIcon = (resource) => `mdi-${resource.icon}`;
     const getResourceUrl = (resource) => `/${resource.name}`;
     const toggleLeftDrawer = () => {
@@ -767,8 +814,11 @@ export default defineComponent({
       getResourceUrl,
       gotoResource,
       hasViews,
+      helpEnabled: !FEATURES.coreOnly,
       home,
       leftDrawerOpen,
+      openHelp,
+      toggleTheme: () => application.value.toggleTheme($q),
       logout,
       pageIcon,
       pageTitle,

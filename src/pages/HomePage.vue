@@ -115,10 +115,10 @@
         </span>
         <span
           class="row rob-bold text-center text-h6 items-center justify-center op-75"
-          v-if="application.user"
+          v-if="application.user && roleLabels.length"
         >
           <q-icon name="mdi-shield-account q-mr-sm" size="sm" />
-          {{ application.user?.roles }}
+          {{ roleLabels.join(", ") }}
         </span>
         <div class="q-pt-xl q-pb-xl op-0">.</div>
       </div>
@@ -634,6 +634,26 @@ export default defineComponent({
         : x && Array.isArray(x)
         ? x[0]
         : null;
+    // The names of the roles the signed-in person holds: role ids resolve
+    // through the users resource's role choices, legacy names stay as they are.
+    const roleLabels = computed(() => {
+      const user = application.value?.user;
+      const roles = user?.role || user?.roles;
+      const held = Array.isArray(roles)
+        ? roles
+        : typeof roles === "string"
+        ? roles.split(",").map((x) => x.trim())
+        : [];
+      const Users = Resource.find("users");
+      const choices = (Users && Users.fields.roles && Users.fields.roles.choices) || [];
+      return held
+        .filter((role) => role)
+        .map((role) => {
+          const choice = choices.find((c) => c.id === role || c.id === role?.id);
+          return choice ? choice.label : role?.name || role;
+        })
+        .filter((label) => typeof label === "string" && label);
+    });
     const roleDashboard = computed(() => {
       if (!Dashboards.value) {
         return null;
@@ -1366,6 +1386,7 @@ export default defineComponent({
       controlBlur,
       dashboardControls,
       roleDashboard,
+      roleLabels,
       time,
     };
   },

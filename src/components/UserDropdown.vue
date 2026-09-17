@@ -110,12 +110,6 @@ export default {
       const user = application?.user || {};
       const result = [
         {
-          id: "home",
-          label: () => "Home",
-          icon: () => "home",
-          click: () => window.location.replace(`/`),
-        },
-        {
           id: "theme",
           label: () => (props.dark ? "Light" : "Dark"),
           icon: () => (props.dark ? "light_mode" : "dark_mode"),
@@ -173,11 +167,14 @@ export default {
         icon: () => "logout",
         click: promptLogout,
       });
+      // Home is a drawer link; on a desktop the theme switch and help sit in
+      // the header, so the menu keeps guides, profile and logout.
+      const shown = result.filter(
+        (item) => props.dense || !["theme", "help"].includes(item.id)
+      );
       return FEATURES.coreOnly
-        ? result.filter((item) =>
-            ["home", "theme", "profile", "logout"].includes(item.id)
-          )
-        : result;
+        ? shown.filter((item) => ["theme", "profile", "logout"].includes(item.id))
+        : shown;
     });
     const userInitials = computed(() => {
       return props.application?.user?.name.substr(0, 1);
