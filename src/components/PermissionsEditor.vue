@@ -17,8 +17,10 @@
           <template v-for="entry in resources" :key="entry.name">
             <tr class="PermissionsEditor__row" :class="{ granted: granted(entry.name).length }">
               <td class="PermissionsEditor__resource">
-                <q-icon :name="entry.icon" size="18px" :color="granted(entry.name).length ? 'primary' : 'grey-6'" />
-                <span>{{ entry.label }}</span>
+                <span class="PermissionsEditor__resource-name">
+                  <q-icon :name="entry.icon" size="18px" :color="granted(entry.name).length ? 'primary' : 'grey-6'" />
+                  <span>{{ entry.label }}</span>
+                </span>
               </td>
               <td v-for="operation in OPERATIONS" :key="operation" class="PermissionsEditor__cell" :class="ruleKind(entry.name, operation)">
                 <q-select
@@ -31,6 +33,7 @@
                   :model-value="ruleKind(entry.name, operation)"
                   @update:model-value="setKind(entry.name, operation, $event)"
                   :readonly="readonly"
+                  :hide-dropdown-icon="readonly"
                   :aria-label="`${entry.label}: ${operation}`"
                   emit-value
                   map-options
@@ -696,8 +699,8 @@ export default {
       width: 112px;
     }
   }
-  .PermissionsEditor__resource {
-    display: flex;
+  .PermissionsEditor__resource-name {
+    display: inline-flex;
     align-items: center;
     gap: 10px;
     font-weight: 500;

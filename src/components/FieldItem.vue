@@ -92,6 +92,23 @@
     padding-top: 18px;
     padding-bottom: 0px;
   }
+  // A permissions matrix lays itself out: no height clamp, no value scaling.
+  &.Field--wide {
+    .Field__value,
+    .Field__value div,
+    .Field__inner > div {
+      max-height: none !important;
+      overflow: visible !important;
+      white-space: normal;
+    }
+    .Field__value .PermissionsEditor__scroll {
+      overflow-x: auto !important;
+    }
+    &:not(.Field--focused) .Field__value {
+      padding-top: 10px;
+      padding-bottom: 0;
+    }
+  }
   .Field__inner {
     position: relative;
   }
@@ -197,6 +214,7 @@
       'Field row': true,
       'Field--json': false,
       'Field--filters': field.type === 'filters',
+      'Field--wide': field.type === 'permissions',
       'Field--gone': !visible || hiddenByEmptyMany,
       'Field--invisible':
         !visible || hiddenByEmptyMany || (focused && !isFocused),
@@ -428,6 +446,7 @@
               (field.type === 'file upload' ||
                 field.type === 'image upload')) ||
             field.type === 'filters' ||
+            field.type === 'permissions' ||
             field.type === 'rich'
           "
           class="Field__value"

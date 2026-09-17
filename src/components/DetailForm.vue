@@ -135,6 +135,35 @@
           @focus="focus"
         />
       </div>
+      <div v-if="wideFields.length" class="col-12 column items-center q-pb-xl">
+        <FieldItem
+          :inline="inline"
+          :dense="true"
+          :mode="mode"
+          :key="field.name"
+          v-for="field in wideFields"
+          :changes="changes"
+          :editing="editing"
+          :jsonMode="jsonMode"
+          :display="focused ? display : null"
+          :fieldViews="fieldViews"
+          :relatedView="relatedViews ? relatedViews[field.name] : null"
+          :visible="displayFields[field.name]"
+          :dark="dark"
+          :dynamicIcons="dynamicIcons"
+          :loading="loading"
+          :resource="resource"
+          :field="field"
+          :record="record"
+          @update="changed(field.name, $event)"
+          @showAdd="emitShowAdd(field.name)"
+          @changeFieldView="emitChangeFieldView"
+          :focused="focused"
+          :canFocus="true"
+          class="q-mt-sm q-mb-lg row full-width"
+          @focus="focus"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -321,6 +350,11 @@ export default {
     const allFields = computed(() =>
       props.fields.filter((x) => x.name !== props.resource.id_field)
     );
+    // A permissions matrix needs the whole row; it sits under the two columns.
+    const isWide = (field) => field.type === "permissions";
+    const narrowFields = computed(() =>
+      allFields.value.filter((field) => !isWide(field))
+    );
     return {
       fieldset,
       onFieldsetChange: (value) => {
@@ -359,16 +393,19 @@ export default {
       allFields,
       leftFields: computed(() =>
         !props.dense
-          ? allFields.value.slice(0, Math.floor(allFields.value.length / 2))
+          ? narrowFields.value.slice(0, Math.ceil(narrowFields.value.length / 2))
           : []
       ),
       rightFields: computed(() =>
         !props.dense
-          ? allFields.value.slice(
-              Math.floor(allFields.value.length / 2),
-              allFields.value.length
+          ? narrowFields.value.slice(
+              Math.ceil(narrowFields.value.length / 2),
+              narrowFields.value.length
             )
           : []
+      ),
+      wideFields: computed(() =>
+        !props.dense ? allFields.value.filter((field) => isWide(field)) : []
       ),
       emitShowAdd: (e) => {
         context.emit("showAdd", e);
