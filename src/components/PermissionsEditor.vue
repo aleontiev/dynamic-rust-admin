@@ -3,335 +3,321 @@
     <div v-if="!resources.length" class="text-grey q-pa-sm">
       No resources accept rules yet.
     </div>
-    <q-list v-else separator>
-      <q-expansion-item
-        v-for="entry in resources"
-        :key="entry.name"
-        :dark="dark"
-        :dense="dense"
-        expand-separator
-        :default-opened="granted(entry.name).length > 0"
-        header-class="PermissionsEditor__header"
-      >
-        <template v-slot:header>
-          <q-item-section avatar>
-            <q-icon
-              :name="entry.icon"
-              :color="granted(entry.name).length ? 'primary' : 'grey-6'"
-            />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>{{ entry.label }}</q-item-label>
-            <q-item-label caption>
-              <span v-if="!granted(entry.name).length">No access</span>
-              <span v-else>
-                <q-chip
-                  v-for="operation in granted(entry.name)"
-                  :key="operation"
-                  dense
-                  size="sm"
+    <div v-else class="PermissionsEditor__scroll">
+      <table class="PermissionsEditor__table">
+        <thead>
+          <tr>
+            <th class="PermissionsEditor__resource-head">Resource</th>
+            <th v-for="operation in OPERATIONS" :key="operation">
+              <q-icon :name="operationIcon(operation)" size="14px" class="q-mr-xs" />{{ operation }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="entry in resources" :key="entry.name">
+            <tr class="PermissionsEditor__row" :class="{ granted: granted(entry.name).length }">
+              <td class="PermissionsEditor__resource">
+                <q-icon :name="entry.icon" size="18px" :color="granted(entry.name).length ? 'primary' : 'grey-6'" />
+                <span>{{ entry.label }}</span>
+              </td>
+              <td v-for="operation in OPERATIONS" :key="operation" class="PermissionsEditor__cell" :class="ruleKind(entry.name, operation)">
+                <q-select
+                  behavior="menu"
                   :dark="dark"
-                  :color="
-                    ruleKind(entry.name, operation) === 'conditional'
-                      ? 'secondary'
-                      : 'primary'
-                  "
-                  text-color="white"
-                  :icon="
-                    ruleKind(entry.name, operation) === 'conditional'
-                      ? 'mdi-filter-outline'
-                      : undefined
-                  "
-                  >{{ operation }}</q-chip
+                  dense
+                  borderless
+                  options-dense
+                  :options="kinds(entry)"
+                  :model-value="ruleKind(entry.name, operation)"
+                  @update:model-value="setKind(entry.name, operation, $event)"
+                  :readonly="readonly"
+                  :aria-label="`${entry.label}: ${operation}`"
+                  emit-value
+                  map-options
                 >
-              </span>
-            </q-item-label>
-          </q-item-section>
-        </template>
+                  <template v-slot:selected-item="scope">
+                    <span class="PermissionsEditor__value" :class="scope.opt.value">
+                      <q-icon :name="scope.opt.icon" size="16px" />{{ scope.opt.label }}
+                    </span>
+                  </template>
+                  <template v-slot:option="scope">
+                    <q-item v-bind="scope.itemProps">
+                      <q-item-section avatar><q-icon :name="scope.opt.icon" size="18px" /></q-item-section>
+                      <q-item-section><q-item-label>{{ scope.opt.label }}</q-item-label><q-item-label caption>{{ scope.opt.caption }}</q-item-label></q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
+              </td>
+            </tr>
+            <template v-for="operation in OPERATIONS" :key="entry.name + operation">
+              <tr v-if="ruleKind(entry.name, operation) === 'conditional'" class="PermissionsEditor__conditions">
+                <td :colspan="OPERATIONS.length + 1">
+                  <div class="PermissionsEditor__condition">
+                    <div class="PermissionsEditor__condition-title">
+                      <q-icon name="mdi-filter-outline" size="14px" />
+                      <strong>{{ entry.label }}</strong> · {{ operation }} is allowed when
+                    </div>
+    <div v-if="editableGroups(entry.name, operation)">
+      <div
+        v-for="(group, groupIndex) in groups(entry.name, operation)"
+        :key="groupIndex"
+        class="PermissionsEditor__group"
+      >
+        <div class="text-caption text-grey q-mb-xs">
+          <span v-if="groupIndex === 0">all of these hold</span>
+          <span v-else>… or all of these hold</span>
+        </div>
         <div
-          v-for="operation in OPERATIONS"
-          :key="operation"
-          class="PermissionsEditor__operation"
+          v-for="(condition, conditionIndex) in group"
+          :key="conditionIndex"
+          class="row items-center no-wrap PermissionsEditor__condition-row"
         >
-          <div class="row items-center no-wrap">
-            <div class="PermissionsEditor__name">
-              <q-icon :name="operationIcon(operation)" size="xs" class="q-mr-xs" />
-              {{ operation }}
-            </div>
-            <q-btn-toggle
-              :model-value="ruleKind(entry.name, operation)"
-              @update:model-value="setKind(entry.name, operation, $event)"
-              :options="kinds(entry)"
+          <div class="PermissionsEditor__indicator" />
+          <q-select
+            class="col-4"
+            behavior="menu"
+            :dark="dark"
+            dense
+            options-dense
+            :label="condition.field ? '' : 'Choose a field'"
+            :options="fieldOptions(entry.name)"
+            :model-value="condition.field"
+            @update:model-value="
+              setCondition(
+                entry.name,
+                operation,
+                groupIndex,
+                conditionIndex,
+                withField(entry.name, condition, $event)
+              )
+            "
+            :readonly="readonly"
+            emit-value
+            map-options
+          >
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section avatar>
+                  <q-icon :name="scope.opt.icon" size="xs" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ scope.opt.label }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <q-select
+            class="PermissionsEditor__operator"
+            behavior="menu"
+            :dark="dark"
+            dense
+            options-dense
+            :options="operatorOptions(entry.name, condition.field)"
+            :model-value="condition.operator || 'exact'"
+            @update:model-value="
+              setCondition(
+                entry.name,
+                operation,
+                groupIndex,
+                conditionIndex,
+                withOperator(condition, $event)
+              )
+            "
+            :readonly="readonly"
+            emit-value
+            map-options
+          >
+            <template v-slot:selected-item="scope">
+              <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
+            </template>
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section avatar>
+                  <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ scope.opt.label }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <div class="col">
+            <q-toggle
+              v-if="condition.operator === 'isnull'"
               :dark="dark"
               dense
-              flat
-              no-caps
-              toggle-color="primary"
-              :readonly="readonly"
+              :model-value="condition.value !== false"
+              :label="condition.value !== false ? 'is empty' : 'is not empty'"
+              @update:model-value="
+                setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                  ...condition,
+                  value: $event,
+                })
+              "
               :disable="readonly"
             />
-          </div>
-          <div
-            v-if="ruleKind(entry.name, operation) === 'conditional'"
-            class="PermissionsEditor__condition"
-          >
-            <div v-if="editableGroups(entry.name, operation)">
-              <div
-                v-for="(group, groupIndex) in groups(entry.name, operation)"
-                :key="groupIndex"
-                class="PermissionsEditor__group"
-              >
-                <div class="text-caption text-grey q-mb-xs">
-                  <span v-if="groupIndex === 0">Allowed when all of these hold</span>
-                  <span v-else>… or when all of these hold</span>
-                </div>
-                <div
-                  v-for="(condition, conditionIndex) in group"
-                  :key="conditionIndex"
-                  class="row items-center no-wrap PermissionsEditor__row"
+            <q-select
+              v-else-if="condition.operator === 'in'"
+              :dark="dark"
+              dense
+              multiple
+              use-chips
+              use-input
+              hide-dropdown-icon
+              new-value-mode="add-unique"
+              input-debounce="0"
+              :options="[]"
+              :model-value="listValue(condition.value)"
+              @update:model-value="
+                setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                  ...condition,
+                  value: $event.map((item) =>
+                    item === USER_ID ? item : typedValue(entry.name, condition.field, item)
+                  ),
+                })
+              "
+              :readonly="readonly"
+              placeholder="Type a value and press Enter"
+            >
+              <template v-slot:selected-item="scope">
+                <q-chip
+                  removable
+                  dense
+                  :dark="dark"
+                  :tabindex="scope.tabindex"
+                  @remove="scope.removeAtIndex(scope.index)"
+                  :icon="scope.opt === USER_ID ? 'mdi-account-circle-outline' : undefined"
                 >
-                  <div class="PermissionsEditor__indicator" />
-                  <q-select
-                    class="col-4"
-                    behavior="menu"
-                    :dark="dark"
-                    dense
-                    options-dense
-                    :label="condition.field ? '' : 'Choose a field'"
-                    :options="fieldOptions(entry.name)"
-                    :model-value="condition.field"
-                    @update:model-value="
-                      setCondition(
-                        entry.name,
-                        operation,
-                        groupIndex,
-                        conditionIndex,
-                        withField(entry.name, condition, $event)
-                      )
-                    "
-                    :readonly="readonly"
-                    emit-value
-                    map-options
-                  >
-                    <template v-slot:option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section avatar>
-                          <q-icon :name="scope.opt.icon" size="xs" />
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt.label }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
-                  <q-select
-                    class="PermissionsEditor__operator"
-                    behavior="menu"
-                    :dark="dark"
-                    dense
-                    options-dense
-                    :options="operatorOptions(entry.name, condition.field)"
-                    :model-value="condition.operator || 'exact'"
-                    @update:model-value="
-                      setCondition(
-                        entry.name,
-                        operation,
-                        groupIndex,
-                        conditionIndex,
-                        withOperator(condition, $event)
-                      )
-                    "
-                    :readonly="readonly"
-                    emit-value
-                    map-options
-                  >
-                    <template v-slot:selected-item="scope">
-                      <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
-                    </template>
-                    <template v-slot:option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section avatar>
-                          <span class="PermissionsEditor__symbol">{{ scope.opt.symbol }}</span>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt.label }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
-                  <div class="col">
-                    <q-toggle
-                      v-if="condition.operator === 'isnull'"
-                      :dark="dark"
-                      dense
-                      :model-value="condition.value !== false"
-                      :label="condition.value !== false ? 'is empty' : 'is not empty'"
-                      @update:model-value="
-                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          ...condition,
-                          value: $event,
-                        })
-                      "
-                      :disable="readonly"
-                    />
-                    <q-select
-                      v-else-if="condition.operator === 'in'"
-                      :dark="dark"
-                      dense
-                      multiple
-                      use-chips
-                      use-input
-                      hide-dropdown-icon
-                      new-value-mode="add-unique"
-                      input-debounce="0"
-                      :options="[]"
-                      :model-value="listValue(condition.value)"
-                      @update:model-value="
-                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          ...condition,
-                          value: $event.map((item) =>
-                            item === USER_ID ? item : typedValue(entry.name, condition.field, item)
-                          ),
-                        })
-                      "
-                      :readonly="readonly"
-                      placeholder="Type a value and press Enter"
-                    >
-                      <template v-slot:selected-item="scope">
-                        <q-chip
-                          removable
-                          dense
-                          :dark="dark"
-                          :tabindex="scope.tabindex"
-                          @remove="scope.removeAtIndex(scope.index)"
-                          :icon="scope.opt === USER_ID ? 'mdi-account-circle-outline' : undefined"
-                        >
-                          {{ scope.opt === USER_ID ? "the signed-in user" : scope.opt }}
-                        </q-chip>
-                      </template>
-                    </q-select>
-                    <q-select
-                      v-else-if="condition.value === USER_ID"
-                      :dark="dark"
-                      dense
-                      readonly
-                      :model-value="'the signed-in user'"
-                      :options="[]"
-                    >
-                      <template v-slot:prepend>
-                        <q-icon name="mdi-account-circle-outline" size="xs" />
-                      </template>
-                    </q-select>
-                    <q-toggle
-                      v-else-if="fieldType(entry.name, condition.field) === 'boolean'"
-                      :dark="dark"
-                      dense
-                      :model-value="condition.value === true"
-                      :label="condition.value === true ? 'yes' : 'no'"
-                      @update:model-value="
-                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          ...condition,
-                          value: $event,
-                        })
-                      "
-                      :disable="readonly"
-                    />
-                    <q-input
-                      v-else
-                      :dark="dark"
-                      dense
-                      :type="
-                        isNumeric(entry.name, condition.field) && condition.operator !== 'icontains'
-                          ? 'number'
-                          : 'text'
-                      "
-                      :model-value="condition.value === null ? '' : condition.value"
-                      @update:model-value="
-                        setCondition(entry.name, operation, groupIndex, conditionIndex, {
-                          ...condition,
-                          value: typedValue(entry.name, condition.field, $event),
-                        })
-                      "
-                      :readonly="readonly"
-                      placeholder="Value"
-                    />
-                  </div>
-                  <q-btn
-                    v-if="!readonly && userReferenceAllowed(condition)"
-                    flat
-                    round
-                    dense
-                    size="0.75rem"
-                    :dark="dark"
-                    :icon="
-                      usesUser(condition) ? 'mdi-account-circle' : 'mdi-account-circle-outline'
-                    "
-                    :color="usesUser(condition) ? 'primary' : 'grey-7'"
-                    @click="
-                      setCondition(
-                        entry.name,
-                        operation,
-                        groupIndex,
-                        conditionIndex,
-                        toggleUser(condition)
-                      )
-                    "
-                  >
-                    <q-tooltip>Compare with the signed-in user's id</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="!readonly"
-                    flat
-                    round
-                    dense
-                    icon="close"
-                    color="grey-7"
-                    @click="removeCondition(entry.name, operation, groupIndex, conditionIndex)"
-                  />
-                </div>
-                <div v-if="!readonly" class="row q-gutter-xs q-mt-xs">
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    icon="add"
-                    label="And"
-                    size="sm"
-                    @click="addCondition(entry.name, operation, groupIndex)"
-                  />
-                  <q-btn
-                    v-if="groupIndex === groups(entry.name, operation).length - 1"
-                    flat
-                    dense
-                    no-caps
-                    icon="mdi-source-branch"
-                    label="Or"
-                    size="sm"
-                    @click="addGroup(entry.name, operation)"
-                  />
-                </div>
-              </div>
-            </div>
-            <div v-else>
-              <div class="text-caption text-grey q-mb-xs">
-                This condition uses a form the editor cannot show; edit it as JSON.
-              </div>
-              <q-input
-                :dark="dark"
-                dense
-                type="textarea"
-                autogrow
-                :model-value="rawJson(entry.name, operation)"
-                @update:model-value="setRaw(entry.name, operation, $event)"
-                :readonly="readonly"
-                :error="!!rawError(entry.name, operation)"
-                :error-message="rawError(entry.name, operation)"
-              />
-            </div>
+                  {{ scope.opt === USER_ID ? "the signed-in user" : scope.opt }}
+                </q-chip>
+              </template>
+            </q-select>
+            <q-select
+              v-else-if="condition.value === USER_ID"
+              :dark="dark"
+              dense
+              readonly
+              :model-value="'the signed-in user'"
+              :options="[]"
+            >
+              <template v-slot:prepend>
+                <q-icon name="mdi-account-circle-outline" size="xs" />
+              </template>
+            </q-select>
+            <q-toggle
+              v-else-if="fieldType(entry.name, condition.field) === 'boolean'"
+              :dark="dark"
+              dense
+              :model-value="condition.value === true"
+              :label="condition.value === true ? 'yes' : 'no'"
+              @update:model-value="
+                setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                  ...condition,
+                  value: $event,
+                })
+              "
+              :disable="readonly"
+            />
+            <q-input
+              v-else
+              :dark="dark"
+              dense
+              :type="
+                isNumeric(entry.name, condition.field) && condition.operator !== 'icontains'
+                  ? 'number'
+                  : 'text'
+              "
+              :model-value="condition.value === null ? '' : condition.value"
+              @update:model-value="
+                setCondition(entry.name, operation, groupIndex, conditionIndex, {
+                  ...condition,
+                  value: typedValue(entry.name, condition.field, $event),
+                })
+              "
+              :readonly="readonly"
+              placeholder="Value"
+            />
           </div>
+          <q-btn
+            v-if="!readonly && userReferenceAllowed(condition)"
+            flat
+            round
+            dense
+            size="0.75rem"
+            :dark="dark"
+            :icon="
+              usesUser(condition) ? 'mdi-account-circle' : 'mdi-account-circle-outline'
+            "
+            :color="usesUser(condition) ? 'primary' : 'grey-7'"
+            @click="
+              setCondition(
+                entry.name,
+                operation,
+                groupIndex,
+                conditionIndex,
+                toggleUser(condition)
+              )
+            "
+          >
+            <q-tooltip>Compare with the signed-in user's id</q-tooltip>
+          </q-btn>
+          <q-btn
+            v-if="!readonly"
+            flat
+            round
+            dense
+            icon="close"
+            color="grey-7"
+            @click="removeCondition(entry.name, operation, groupIndex, conditionIndex)"
+          />
         </div>
-      </q-expansion-item>
-    </q-list>
+        <div v-if="!readonly" class="row q-gutter-xs q-mt-xs">
+          <q-btn
+            flat
+            dense
+            no-caps
+            icon="add"
+            label="And"
+            size="sm"
+            @click="addCondition(entry.name, operation, groupIndex)"
+          />
+          <q-btn
+            v-if="groupIndex === groups(entry.name, operation).length - 1"
+            flat
+            dense
+            no-caps
+            icon="mdi-source-branch"
+            label="Or"
+            size="sm"
+            @click="addGroup(entry.name, operation)"
+          />
+        </div>
+      </div>
+    </div>
+    <div v-else>
+      <div class="text-caption text-grey q-mb-xs">
+        This condition uses a form the editor cannot show; edit it as JSON.
+      </div>
+      <q-input
+        :dark="dark"
+        dense
+        type="textarea"
+        autogrow
+        :model-value="rawJson(entry.name, operation)"
+        @update:model-value="setRaw(entry.name, operation, $event)"
+        :readonly="readonly"
+        :error="!!rawError(entry.name, operation)"
+        :error-message="rawError(entry.name, operation)"
+      />
+    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </template>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -461,11 +447,11 @@ export default {
       OPERATIONS.filter((operation) => ruleKind(name, operation) !== "denied");
     const kinds = (entry) => {
       const options = [
-        { label: "Denied", value: "denied" },
-        { label: "Allowed", value: "allowed" },
+        { label: "Denied", value: "denied", icon: "mdi-minus-circle-outline", caption: "This role adds no access" },
+        { label: "Allowed", value: "allowed", icon: "mdi-check-circle-outline", caption: "Every record" },
       ];
       if (entry.conditional) {
-        options.push({ label: "When…", value: "conditional" });
+        options.push({ label: "When…", value: "conditional", icon: "mdi-filter-outline", caption: "Only records that meet conditions" });
       }
       return options;
     };
@@ -682,22 +668,85 @@ export default {
 <style lang="scss">
 .PermissionsEditor {
   width: 100%;
-  .PermissionsEditor__operation {
-    padding: 4px 8px 4px 16px;
+  // The detail view enlarges values for the focused field; a matrix reads at one size.
+  font-size: 13px;
+  line-height: 1.4;
+  .PermissionsEditor__scroll {
+    overflow-x: auto;
   }
-  .PermissionsEditor__name {
-    width: 90px;
-    text-transform: capitalize;
+  .PermissionsEditor__table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    th, td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(128, 160, 144, 0.22);
+      vertical-align: middle;
+      font-size: 13px;
+    }
+    th {
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: capitalize;
+      opacity: 0.75;
+      white-space: nowrap;
+    }
+    th:not(.PermissionsEditor__resource-head) {
+      width: 112px;
+    }
+  }
+  .PermissionsEditor__resource {
     display: flex;
     align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    white-space: nowrap;
   }
-  .PermissionsEditor__condition {
-    margin: 4px 0 8px 90px;
+  .PermissionsEditor__row:not(.granted) .PermissionsEditor__resource {
+    opacity: 0.75;
+  }
+  .PermissionsEditor__cell {
+    padding-top: 0;
+    padding-bottom: 0;
+    .q-field {
+      font-size: 13px;
+    }
+    .q-field__native, .q-field__control {
+      min-height: 34px;
+    }
+    &.denied .PermissionsEditor__value {
+      opacity: 0.55;
+    }
+    &.allowed .PermissionsEditor__value {
+      color: var(--q-primary);
+    }
+    &.conditional .PermissionsEditor__value {
+      color: var(--q-secondary);
+    }
+  }
+  .PermissionsEditor__value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .PermissionsEditor__conditions td {
+    padding: 8px 8px 12px 24px;
+    background: rgba(128, 160, 144, 0.06);
+  }
+  .PermissionsEditor__condition-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-bottom: 8px;
+    opacity: 0.85;
   }
   .PermissionsEditor__group {
     margin-bottom: 8px;
   }
-  .PermissionsEditor__row {
+  .PermissionsEditor__condition-row {
     position: relative;
     padding-left: 10px;
     margin-bottom: 3px;
@@ -719,9 +768,6 @@ export default {
     min-width: 24px;
     text-align: center;
     font-size: 1.1em;
-  }
-  .q-chip {
-    margin: 0 4px 0 0;
   }
 }
 </style>

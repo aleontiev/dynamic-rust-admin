@@ -1286,6 +1286,8 @@ class Resource extends Model {
       return "key";
     }
     switch (field.type) {
+      case "permissions":
+        return "mdi-shield-key-outline";
       case "string":
         return "text_fields";
       case "number":
