@@ -316,7 +316,7 @@ import { useQuasar, setCssVar } from "quasar";
 import { onMounted, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import { BRAND, COPILOT_URL, FEATURES } from "../config";
+import { BRAND, COPILOT_URL } from "../config";
 import { buildAdd } from "../utilities";
 import {
   SearchResult,
@@ -410,10 +410,8 @@ export default defineComponent({
       let localPreference;
       try { localPreference = user?.id ? localStorage.getItem(`dream-admin-theme:${user.id}`) : null; } catch (_) { /* Embedded browsers can disable storage. */ }
       const preference = localPreference === 'true' ? true : localPreference === 'false' ? false : user?.data?.dark;
-      const enabled =
-        typeof preference === "boolean"
-          ? preference
-          : FEATURES.coreOnly || $q.dark.isActive;
+      // Dark unless the person chose otherwise: the admin's default look.
+      const enabled = typeof preference === "boolean" ? preference : true;
       setCssVar(
         "colorscheme",
         enabled ? "dark" : "light",
