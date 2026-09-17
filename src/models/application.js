@@ -227,9 +227,18 @@ class Application extends SingletonModel {
     const { schema, user, views, dashboards, guides, guideCompletions, s3, syntheticResources, } =
       responses;
     if (schema) {
+      const listed = Object.values(schema.data.resources);
       Resource.insert({
-        data: Object.values(schema.data.resources),
+        data: listed,
       });
+      // A resource the person may no longer list leaves the store, and with
+      // it the navigation and search.
+      const names = new Set(listed.map((resource) => resource.name));
+      const synthetic = new Set((responses.syntheticResources || []).map((resource) => resource.name));
+      Resource.query()
+        .where((resource) => !synthetic.has(resource.name) && !names.has(resource.name))
+        .get()
+        .forEach((resource) => Resource.delete(resource.name));
     }
     if (syntheticResources && syntheticResources.length) {
       Resource.insert({

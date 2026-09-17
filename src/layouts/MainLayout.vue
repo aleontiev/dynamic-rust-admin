@@ -351,7 +351,7 @@
 
 <script>
 import { useQuasar, setCssVar } from "quasar";
-import { onMounted, defineComponent, ref, computed, watch } from "vue";
+import { onMounted, onUnmounted, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { BRAND, COPILOT_URL, FEATURES } from "../config";
@@ -728,6 +728,18 @@ export default defineComponent({
       route.path === "/" ? (leftDrawerOpen.value = false) : router.push("/");
     // On a desktop the theme switch and help live in the header as icons; the
     // account menu keeps guides, profile and logout.
+    // A saved role, or a change to the signed-in person's roles, takes effect
+    // at once: the schema and the person are fetched again, so the drawer and
+    // every page's permissions follow without a reload.
+    const onAccessChanged = async () => {
+      try {
+        await Application.refreshMetadata({ s3: false, metadata: false });
+      } catch (error) {
+        console.warn("Could not refresh access after a change", error);
+      }
+    };
+    onMounted(() => window.addEventListener("dynamic-admin:access-changed", onAccessChanged));
+    onUnmounted(() => window.removeEventListener("dynamic-admin:access-changed", onAccessChanged));
     const openHelp = () => {
       router.replace({
         name: route.name,

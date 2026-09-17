@@ -404,6 +404,7 @@ class Resource extends Model {
       signal,
     });
     Resource.cacheResponse(response);
+    this.accessChanged(response);
     return response;
   }
   async actionAPI({ id, data, action, signal = null }) {
@@ -421,6 +422,7 @@ class Resource extends Model {
       signal,
     });
     this.cacheDelete(id);
+    this.accessChanged({ data: { [this.singular || this.name]: { id } } });
     return response;
   }
   async patchAPI({
@@ -473,7 +475,23 @@ class Resource extends Model {
       signal,
     });
     Resource.cacheResponse(response);
+    this.accessChanged(response);
     return response;
+  }
+  // Saving a role, or the roles of the signed-in person, changes what they
+  // may do; the layout listens and refreshes the schema and the person, so the
+  // navigation and every page's permissions follow at once.
+  accessChanged(response) {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const written = response?.data?.[this.singular] || response?.data?.[this.name];
+    const user = Resource.getApplication()?.user;
+    const own =
+      this.name === "users" && user && written && String(written.id) === String(user.id);
+    if (this.name === "roles" || own) {
+      window.dispatchEvent(new CustomEvent("dynamic-admin:access-changed"));
+    }
   }
   async getAPI({
     id,

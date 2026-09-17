@@ -66,6 +66,7 @@ import ImpersonateDialog from "./ImpersonateDialog";
 import ImpersonateStopDialog from "./ImpersonateStopDialog";
 import api from "../api";
 import { FEATURES } from "../config";
+import { useStore } from "vuex";
 
 export default {
   components: {
@@ -80,6 +81,7 @@ export default {
   emits: ["close"],
   setup(props) {
     const $q = useQuasar();
+    const Resource = useStore().$db().model("_resources");
     const isOpen = ref(false);
     const showImpersonateDialog = ref(false);
     const showImpersonateStop = ref(false);
@@ -169,8 +171,13 @@ export default {
       });
       // Home is a drawer link; on a desktop the theme switch and help sit in
       // the header, so the menu keeps guides, profile and logout.
+      // Guides are a layer an app may not have: without a guides resource
+      // there is nothing to open, so the entry stays out of the menu.
+      const hasGuides = !!Resource.find("guides");
       const shown = result.filter(
-        (item) => props.dense || !["theme", "help"].includes(item.id)
+        (item) =>
+          (props.dense || !["theme", "help"].includes(item.id)) &&
+          (item.id !== "guides" || hasGuides)
       );
       return FEATURES.coreOnly
         ? shown.filter((item) => ["theme", "profile", "logout"].includes(item.id))
