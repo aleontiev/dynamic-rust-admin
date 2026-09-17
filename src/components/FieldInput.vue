@@ -466,13 +466,14 @@ export default {
         // convert to Quill Delta format, object with ops key
         return $value;
       } else if (field.choices) {
-        return $value !== null
-          ? props.resource.getChoiceDisplayValue(
-              $value,
-              field.name,
-              props.record
-            )
-          : null;
+        // A list of choices (say a user's roles) is edited as one chip per
+        // item, each showing its label rather than its stored id.
+        const display = (item) =>
+          props.resource.getChoiceDisplayValue(item, field.name, props.record);
+        if ($value === null) {
+          return null;
+        }
+        return Array.isArray($value) ? $value.map(display) : display($value);
       } else if (field.type === "boolean") {
         const base =
           $value !== null ? parseBoolean($value.value || $value) : null;
