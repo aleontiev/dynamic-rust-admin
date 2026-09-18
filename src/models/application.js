@@ -209,21 +209,19 @@ class Application extends SingletonModel {
     if (options.s3 !== false) {
       requests.s3 = api.getS3();
     }
+    // Saved pages and guides are optional: an app without them, or a person
+    // whose roles do not reach them, still loads.
+    const optional = (endpoint) =>
+      api.get(endpoint, { params: { per_page: 10000 } }).catch(() => null);
     if (options.views !== false && options.metadata !== false) {
-      requests.views = api.get("views", { params: { per_page: 10000 } });
+      requests.views = optional("views");
     }
     if (options.dashboards !== false && options.metadata !== false) {
-      requests.dashboards = api.get("dashboards", {
-        params: { per_page: 10000 },
-      });
+      requests.dashboards = optional("dashboards");
     }
     if (options.guides !== false && options.metadata !== false) {
-      requests.guides = api.get("guides", {
-        params: { per_page: 10000 },
-      });
-      requests.guideCompletions = api.get("guide_completions", {
-        params: { per_page: 10000 },
-      });
+      requests.guides = optional("guides");
+      requests.guideCompletions = optional("guide_completions");
     }
     requests.syntheticResources = loadSyntheticResources().catch(() => []);
     const responses = await all(requests);

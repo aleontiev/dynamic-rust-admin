@@ -99,11 +99,12 @@ export function buildSave(base) {
 }
 
 export function buildIsAuthenticated(base) {
-  // check users/me endpoint
-  const options = buildEndpoint("options", base);
+  // The person's own record answers for anyone signed in, whether or not
+  // their roles let them see the users resource itself.
+  const get = buildEndpoint("get", base);
   return async () => {
     try {
-      const response = await options("users");
+      const response = await get("users/me");
       // must be JSON output (not HTML redirect)
       if (typeof response.data === "string") {
         // html auth failed redirect
@@ -165,7 +166,7 @@ export async function request(method, base, endpoint, rest = {}) {
       // credentials were not provided" dialog it cannot act on. End the session
       // instead, whatever the method: it clears local state and sends the
       // browser to the login page with the current URL as `next`. (The
-      // isAuthenticated() probe is an OPTIONS request; a 401 there ends the
+      // isAuthenticated() probe is a users/me request; a 401 there ends the
       // session too, which is where a failed probe was headed anyway.)
       if (error?.response?.status === 401) {
         return endSession();
