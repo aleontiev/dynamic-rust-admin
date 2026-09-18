@@ -15,6 +15,9 @@ class Application extends SingletonModel {
       editing: this.boolean(false),
       user: this.attr(),
       s3Credentials: this.attr(),
+      // "member" when the person holds a role, "none" when they hold none and
+      // so reach nothing; absent for APIs that do not say.
+      access: this.attr(null),
     };
   }
   static stopEditing() {
@@ -227,6 +230,9 @@ class Application extends SingletonModel {
     const { schema, user, views, dashboards, guides, guideCompletions, s3, syntheticResources, } =
       responses;
     if (schema) {
+      Application.updateInstance({
+        access: typeof schema.data.access === "string" ? schema.data.access : null,
+      });
       const listed = Object.values(schema.data.resources);
       Resource.insert({
         data: listed,

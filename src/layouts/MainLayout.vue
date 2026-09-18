@@ -335,7 +335,16 @@
     </q-drawer>
 
     <q-page-container v-if="application.loaded" class="page-content-container">
-      <router-view />
+      <div v-if="application.access === 'none'" class="no-access column items-center justify-center q-pa-xl text-center" role="status">
+        <q-icon name="mdi-shield-lock-outline" size="56px" color="grey-6" class="q-mb-md" />
+        <div class="text-h5 q-mb-sm">You don't have access yet</div>
+        <p class="op-75" style="max-width: 420px">
+          Your account on {{ appName }} has no role, so there is nothing to show.
+          Ask an administrator of {{ appName }} to give you a role, then sign in again.
+        </p>
+        <q-btn flat no-caps icon="logout" label="Sign out" class="q-mt-md" @click="logout" />
+      </div>
+      <router-view v-else />
     </q-page-container>
     <HelpDialog :dark="dark" :dense="dense" />
     <GuideDialog :dark="dark" :dense="dense" />
@@ -862,3 +871,8 @@ export default defineComponent({
   },
 });
 </script>
+<style lang="scss">
+.no-access {
+  min-height: calc(100vh - 50px);
+}
+</style>
