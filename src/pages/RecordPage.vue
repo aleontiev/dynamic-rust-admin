@@ -228,7 +228,7 @@
       :actionTodo="actionTodo"
       :value="showActionDialog"
       @input="showActionDialog = $event"
-      @done="request()"
+      @done="reload"
       :dense="dense"
       :dark="dark"
       :resource="resource"
@@ -293,7 +293,7 @@ import {
   getErrorMessage,
   deserializeFilterQuery,
 } from "../utilities";
-import { API_URL } from "../config";
+import { resolveApiUrl } from "../config";
 import { useHead } from "@vueuse/head";
 import api from "../api";
 
@@ -896,7 +896,7 @@ export default defineComponent({
       const $resource = resource.value;
       try {
         const data = action.navigate ? { next: window.location.href } : {};
-        const response = await api.request(method, API_URL, url, { data });
+        const response = await api.request(method, resolveApiUrl(url), "", { data });
         if (response.data && typeof response.data.redirect === "string") {
           follow(response.data.redirect);
           return;
@@ -1031,6 +1031,8 @@ export default defineComponent({
       fullscreen,
       actions,
       doAction,
+      // After an action's dialog runs it: the record may have changed.
+      reload: () => request(),
       dense,
       dark,
       resource,

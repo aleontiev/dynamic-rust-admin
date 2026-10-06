@@ -8,6 +8,14 @@ export const API_SCHEME = new URL(
   API_URL,
   window.location.origin
 ).protocol.slice(0, -1);
+// Where a URL the API describes (an action's `/api/admin/...` path, or one
+// relative to the API) is fetched from: resolved against the API's own URL, so
+// an absolute path is not appended to the API's prefix a second time.
+export const resolveApiUrl = (url) =>
+  new URL(
+    url,
+    new URL(API_URL.replace(/\/?$/, "/"), window.location.href)
+  ).href;
 export const COPILOT_URL = config.copilotUrl || "";
 export const COPILOT_BASE = COPILOT_URL;
 export const FEATURES = { coreOnly: config.coreOnly === true };

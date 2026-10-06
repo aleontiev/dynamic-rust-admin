@@ -17,7 +17,7 @@ import {
 } from "../utilities";
 import YAML from "json-to-pretty-yaml";
 import api from "../api";
-import { API_URL } from "../config";
+import { API_URL, resolveApiUrl } from "../config";
 import { uploadFile } from "../api/aws";
 
 const YAMLIFY = false;
@@ -84,6 +84,8 @@ const columnCreator = (resource) => (k) => {
     resource_field: metadata.resource_field,
     // Permission fields carry the resources their rules may name.
     resources: metadata.resources,
+    // Secrets edit as password inputs and never show a saved value.
+    secret: metadata.secret,
     extra: metadata.extra,
     dynamic: metadata.dynamic,
     resource,
@@ -420,7 +422,7 @@ class Resource extends Model {
     // Dynamic REST convention `<resource>/<id>/<action>/` applies.
     const endpoint = id ? `${this.name}/${id}/${action}` : ``;
     const response = url
-      ? await api.request("post", API_URL, url, { data, signal })
+      ? await api.request("post", resolveApiUrl(url), "", { data, signal })
       : await api.post(endpoint, {
           data,
           signal,
