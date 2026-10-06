@@ -21,7 +21,7 @@
       >
         <q-icon :name="actionTodo.icon" size="sm" />
         <q-toolbar-title>
-          {{ toTitleCase(actionTodo.name).replace("_", " ") }}
+          {{ actionTodo.label || toTitleCase(actionTodo.name).replace("_", " ") }}
         </q-toolbar-title>
         <q-btn flat round dense icon="close" v-if="!saving" />
       </q-toolbar>
@@ -91,7 +91,7 @@ export default {
     ActionBar,
     DetailForm,
   },
-  emits: ["input", "added"],
+  emits: ["input", "added", "done"],
   setup(props, context) {
     const store = useStore();
     const database = store.$db();
@@ -160,6 +160,7 @@ export default {
     const saving = ref(false);
     const then = () => {
       isOpen.value = false;
+      context.emit("done");
     };
 
     const save = buildAction({

@@ -15,10 +15,10 @@
         </thead>
         <tbody>
           <template v-for="entry in resources" :key="entry.name">
-            <tr class="PermissionsEditor__row" :class="{ granted: granted(entry.name).length }">
+            <tr class="PermissionsEditor__row" :class="{ granted: granted(entry).length }">
               <td class="PermissionsEditor__resource">
                 <span class="PermissionsEditor__resource-name">
-                  <q-icon :name="entry.icon" size="18px" :color="granted(entry.name).length ? 'primary' : 'grey-6'" />
+                  <q-icon :name="entry.icon" size="18px" :color="granted(entry).length ? 'primary' : 'grey-6'" />
                   <span>{{ entry.label }}</span>
                 </span>
               </td>
@@ -52,13 +52,59 @@
                 </q-select>
               </td>
             </tr>
-            <template v-for="operation in OPERATIONS" :key="entry.name + operation">
+            <!-- The resource's own actions (approve, send, ...), granted like operations. -->
+            <tr v-if="entry.actions.length" class="PermissionsEditor__actions-row">
+              <td class="PermissionsEditor__actions-head">
+                <q-icon name="mdi-gesture-tap-button" size="16px" />
+                <span>Actions</span>
+              </td>
+              <td :colspan="OPERATIONS.length">
+                <div class="PermissionsEditor__actions">
+                <div
+                  v-for="action in entry.actions"
+                  :key="action.name"
+                  class="PermissionsEditor__action PermissionsEditor__cell"
+                  :class="ruleKind(entry.name, action.name)"
+                >
+                  <span class="PermissionsEditor__action-label">{{ action.label }}</span>
+                  <q-select
+                    behavior="menu"
+                    :dark="dark"
+                    dense
+                    borderless
+                    options-dense
+                    :options="kinds({ conditional: true })"
+                    :model-value="ruleKind(entry.name, action.name)"
+                    @update:model-value="setKind(entry.name, action.name, $event)"
+                    :readonly="readonly"
+                    :hide-dropdown-icon="readonly"
+                    :aria-label="`${entry.label}: ${action.label}`"
+                    emit-value
+                    map-options
+                  >
+                    <template v-slot:selected-item="scope">
+                      <span class="PermissionsEditor__value" :class="scope.opt.value">
+                        <q-icon :name="scope.opt.icon" size="16px" />{{ scope.opt.label }}
+                      </span>
+                    </template>
+                    <template v-slot:option="scope">
+                      <q-item v-bind="scope.itemProps">
+                        <q-item-section avatar><q-icon :name="scope.opt.icon" size="18px" /></q-item-section>
+                        <q-item-section><q-item-label>{{ scope.opt.label }}</q-item-label><q-item-label caption>{{ scope.opt.caption }}</q-item-label></q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
+                </div>
+                </div>
+              </td>
+            </tr>
+            <template v-for="operation in operationsOf(entry)" :key="entry.name + operation">
               <tr v-if="ruleKind(entry.name, operation) === 'conditional'" class="PermissionsEditor__conditions">
                 <td :colspan="OPERATIONS.length + 1">
                   <div class="PermissionsEditor__condition">
                     <div class="PermissionsEditor__condition-title">
                       <q-icon name="mdi-filter-outline" size="14px" />
-                      <strong>{{ entry.label }}</strong> · {{ operation }} is allowed when
+                      <strong>{{ entry.label }}</strong> · {{ operationLabel(entry, operation) }} is allowed when
                     </div>
     <div v-if="editableGroups(entry.name, operation)">
       <div
@@ -429,6 +475,7 @@ export default {
             name,
             label: (meta && meta.label) || (resource && resource.label) || name,
             conditional: !!(meta && meta.conditional),
+            actions: (meta && Array.isArray(meta.actions) && meta.actions) || [],
             icon: resource && resource.icon ? `mdi-${resource.icon}` : "mdi-table",
           };
         })
@@ -446,8 +493,19 @@ export default {
       }
       return "denied";
     };
-    const granted = (name) =>
-      OPERATIONS.filter((operation) => ruleKind(name, operation) !== "denied");
+    // The operations and actions a role may be granted on a resource.
+    const operationsOf = (entry) => [
+      ...OPERATIONS,
+      ...entry.actions.map((action) => action.name),
+    ];
+    const operationLabel = (entry, operation) => {
+      const action = entry.actions.find((item) => item.name === operation);
+      return action ? action.label : operation;
+    };
+    const granted = (entry) =>
+      operationsOf(entry).filter(
+        (operation) => ruleKind(entry.name, operation) !== "denied"
+      );
     const kinds = (entry) => {
       const options = [
         { label: "Denied", value: "denied", icon: "mdi-minus-circle-outline", caption: "This role adds no access" },
@@ -639,6 +697,8 @@ export default {
       USER_ID,
       resources,
       granted,
+      operationsOf,
+      operationLabel,
       ruleKind,
       kinds,
       setKind,
@@ -727,6 +787,35 @@ export default {
     &.conditional .PermissionsEditor__value {
       color: var(--q-secondary);
     }
+  }
+  .PermissionsEditor__actions-row td {
+    border-bottom-style: dashed;
+  }
+  .PermissionsEditor__actions-head {
+    padding-left: 36px !important;
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: nowrap;
+    .q-icon {
+      margin-right: 6px;
+    }
+  }
+  .PermissionsEditor__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+  .PermissionsEditor__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+  }
+  .PermissionsEditor__action-label {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
   }
   .PermissionsEditor__value {
     display: inline-flex;

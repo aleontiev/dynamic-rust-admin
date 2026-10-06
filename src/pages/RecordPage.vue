@@ -228,6 +228,7 @@
       :actionTodo="actionTodo"
       :value="showActionDialog"
       @input="showActionDialog = $event"
+      @done="request()"
       :dense="dense"
       :dark="dark"
       :resource="resource"
@@ -870,21 +871,47 @@ export default defineComponent({
         (action) => !action.iframe
       );
     });
+    // An action that hands the browser to another site (connecting an outside
+    // service) answers with `redirect`. Such pages refuse to load inside the
+    // preview frame, so a framed admin opens them in a new tab.
+    const follow = (target) => {
+      const framed = window.self !== window.top;
+      if (!framed) {
+        window.location.assign(target);
+        return;
+      }
+      if (!window.open(target, "_blank", "noopener")) {
+        $q.notify({
+          type: "info",
+          timeout: 0,
+          html: true,
+          message: `<a href="${encodeURI(target)}" target="_blank" rel="noopener">Continue in a new tab</a>`,
+          actions: [{ icon: "close", color: "white" }],
+        });
+      }
+    };
     const executeAction = async (action) => {
       const method = action.method || "get";
       const url = action.url;
       const $resource = resource.value;
       try {
-        const response = await api.request(method, API_URL, url);
+        const data = action.navigate ? { next: window.location.href } : {};
+        const response = await api.request(method, API_URL, url, { data });
+        if (response.data && typeof response.data.redirect === "string") {
+          follow(response.data.redirect);
+          return;
+        }
         // try to cache newly changed data
         if (response.data && response.data[$resource.singular]) {
           Resource.cacheResponse(response);
         }
+        // The action may have changed this record (its state, totals).
+        request();
         $q.notify({
           type: "positive",
           timeout: 1000,
           color: "primary",
-          message: `${action.label} succeeded`,
+          message: `${action.label || action.name} succeeded`,
           icon: "done",
           textColor: "white",
           classes: "full-width",

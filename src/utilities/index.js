@@ -1131,6 +1131,8 @@ export const buildAction =
     const $resource = resource.value || resource;
     let $data = data.value;
     let $action = action.value.name;
+    const $url = action.value.url || null;
+    const $label = action.value.label || $action;
     const $id = $record ? $record[$resource.id_field] : null;
     let response,
       error = null;
@@ -1140,6 +1142,7 @@ export const buildAction =
         field: $field,
         data: $data,
         action: $action,
+        url: $url,
       });
     } catch (err) {
       error = err;
@@ -1149,7 +1152,7 @@ export const buildAction =
       handleError(quasar, error);
     } else {
       // succeeded
-      let message = `Action "${$action}" completed`;
+      let message = `${$label} succeeded`;
       if (typeof response.data !== "string") {
         if (response.data.message && Object.keys(response.data).length === 1) {
           // extract message from response data

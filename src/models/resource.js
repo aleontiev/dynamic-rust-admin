@@ -347,9 +347,17 @@ class Resource extends Model {
         return !action.when || evaluate(action.when, { instance: record });
       })
       .map((action) => {
+        // Dynamic Rust describes an action's URL with `:id` (older runtimes
+        // with `{id}`) and its verb in `method` or `methods`.
+        const method =
+          action.method ||
+          (Array.isArray(action.methods) && action.methods.length
+            ? action.methods[0].toLowerCase()
+            : undefined);
         return {
           ...action,
-          url: action.url.replace(":id", id),
+          method,
+          url: action.url.replace(":id", id).replace("{id}", id),
         };
       });
   }
@@ -407,12 +415,16 @@ class Resource extends Model {
     this.accessChanged(response);
     return response;
   }
-  async actionAPI({ id, data, action, signal = null }) {
+  async actionAPI({ id, data, action, url = null, signal = null }) {
+    // An action that declares its own URL is posted there; otherwise the
+    // Dynamic REST convention `<resource>/<id>/<action>/` applies.
     const endpoint = id ? `${this.name}/${id}/${action}` : ``;
-    const response = await api.post(endpoint, {
-      data,
-      signal,
-    });
+    const response = url
+      ? await api.request("post", API_URL, url, { data, signal })
+      : await api.post(endpoint, {
+          data,
+          signal,
+        });
     Resource.cacheResponse(response);
     return response;
   }

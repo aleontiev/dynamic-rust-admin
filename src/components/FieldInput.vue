@@ -304,6 +304,18 @@
           hide-dropdown-icon
         />
       </div>
+      <div v-else-if="field.secret">
+        <!-- Secrets are never sent back; typing replaces the saved one. -->
+        <q-input
+          :readonly="readonly"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Enter a new secret"
+          :model-value="live === 'Saved' ? '' : live"
+          @update:model-value="live = $event"
+          :input-style="{ fontSize: null }"
+        />
+      </div>
       <div v-else>
         <q-input
           :readonly="readonly"
