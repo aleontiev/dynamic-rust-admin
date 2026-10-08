@@ -26,7 +26,8 @@
   </div>
   <div v-else-if="field.type === 'permissions'" class="FieldValue__permissions">
     <div v-for="line in permissionLines" :key="line.resource">
-      <span class="text-weight-medium">{{ line.resource }}</span>: {{ line.rules }}
+      <span class="text-weight-medium">{{ line.resource }}</span>:
+      {{ [line.rules, line.fields && `Fields: ${line.fields}`].filter(Boolean).join('; ') }}
     </div>
     <span v-if="!permissionLines.length" class="text-grey">No access</span>
   </div>
@@ -58,6 +59,7 @@
 import { computed, ref } from 'vue';
 import { useQuasar } from "quasar";
 import { formatShortNumber } from '../utilities';
+import { FIELD_OVERRIDES, describeFieldOverrides } from '../utilities/permissions';
 import PageLink from './PageLink';
 import ApexCharts from 'vue3-apexcharts';
 import MediaPreview from './MediaPreview';
@@ -159,11 +161,14 @@ export default {
       const offered = props.field.resources || {};
       return Object.entries(props.value).map(([name, rules]) => ({
         resource: (offered[name] && offered[name].label) || name,
+        // Field overrides sit beside the operations; they are not one.
         rules: Object.entries(rules || {})
+          .filter(([operation]) => operation !== FIELD_OVERRIDES)
           .filter(([, rule]) => rule === true || (rule && typeof rule === 'object'))
           .map(([operation, rule]) => (rule === true ? operation : `${operation} (when…)`))
           .join(', '),
-      })).filter((line) => line.rules);
+        fields: describeFieldOverrides(rules, offered[name] && offered[name].fields),
+      })).filter((line) => line.rules || line.fields);
     });
     return {
       permissionLines,

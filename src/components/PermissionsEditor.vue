@@ -98,6 +98,90 @@
                 </div>
               </td>
             </tr>
+            <!-- Per-field overrides: what this role sees and may change. -->
+            <tr
+              v-if="entry.fields.length && (!readonly || overrideCount(entry))"
+              class="PermissionsEditor__fields-row"
+            >
+              <td :colspan="OPERATIONS.length + 1">
+                <!-- Stays in view while the matrix scrolls sideways on a phone. -->
+                <div class="PermissionsEditor__fields-panel">
+                  <div class="PermissionsEditor__fields-bar">
+                    <q-btn
+                      flat
+                      dense
+                      no-caps
+                      size="sm"
+                      :dark="dark"
+                      :icon="fieldsOpen(entry) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                      :aria-expanded="fieldsOpen(entry) ? 'true' : 'false'"
+                      :aria-label="`${entry.label}: fields`"
+                      @click="toggleFields(entry.name)"
+                    >
+                      <span class="q-ml-xs">Fields</span>
+                      <q-badge
+                        v-if="overrideCount(entry)"
+                        rounded
+                        color="primary"
+                        class="q-ml-xs"
+                        :label="overrideCount(entry)"
+                      />
+                    </q-btn>
+                    <span
+                      v-if="!fieldsOpen(entry)"
+                      class="PermissionsEditor__fields-summary"
+                      @click="toggleFields(entry.name)"
+                    >
+                      {{ overrideSummary(entry) || "As the app declares them" }}
+                    </span>
+                  </div>
+                  <div v-if="fieldsOpen(entry)" class="PermissionsEditor__fields">
+                    <div class="PermissionsEditor__fields-note">
+                      Across a person's roles, a field is visible if any role shows it,
+                      and changeable if any role lets them change it.
+                    </div>
+                    <div
+                      v-for="item in entry.fields"
+                      :key="item.name"
+                      class="PermissionsEditor__field"
+                    >
+                      <span class="PermissionsEditor__field-label">{{ item.label }}</span>
+                      <q-select
+                        v-for="aspect in ASPECTS"
+                        :key="aspect"
+                        class="PermissionsEditor__choice"
+                        :class="{ overridden: fieldChoice(entry.name, item.name, aspect) !== 'default' }"
+                        behavior="menu"
+                        :dark="dark"
+                        dense
+                        borderless
+                        options-dense
+                        :options="choiceOptions(item, aspect)"
+                        :model-value="fieldChoice(entry.name, item.name, aspect)"
+                        @update:model-value="setFieldChoice(entry.name, item.name, aspect, $event)"
+                        :readonly="readonly"
+                        :hide-dropdown-icon="readonly"
+                        :aria-label="`${entry.label}: ${item.label} ${aspect}`"
+                        emit-value
+                        map-options
+                      >
+                        <template v-slot:selected-item="scope">
+                          <span class="PermissionsEditor__value">
+                            <q-icon :name="scope.opt.icon" size="16px" />{{ scope.opt.label }}
+                          </span>
+                        </template>
+                        <template v-slot:option="scope">
+                          <q-item v-bind="scope.itemProps">
+                            <q-item-section avatar><q-icon :name="scope.opt.icon" size="18px" /></q-item-section>
+                            <q-item-section><q-item-label>{{ scope.opt.label }}</q-item-label><q-item-label caption>{{ scope.opt.caption }}</q-item-label></q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
             <template v-for="operation in operationsOf(entry)" :key="entry.name + operation">
               <tr v-if="ruleKind(entry.name, operation) === 'conditional'" class="PermissionsEditor__conditions">
                 <td :colspan="OPERATIONS.length + 1">
@@ -373,6 +457,16 @@
 <script>
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
+import {
+  FIELD_CHOICES,
+  FIELD_OVERRIDES,
+  describeFieldOverrides,
+  fieldChoice as storedChoice,
+  fieldChoiceOptions,
+  fieldOverrides,
+  overrideCount as countOverrides,
+  withFieldChoice,
+} from "../utilities/permissions";
 
 export const OPERATIONS = ["list", "read", "create", "update", "delete"];
 export const USER_ID = "$user.id";
@@ -387,6 +481,7 @@ export const CONDITION_OPERATORS = [
   { value: "isnull", label: "is empty", symbol: "∅" },
 ];
 const OPERATOR_NAMES = CONDITION_OPERATORS.map((operator) => operator.value);
+const ASPECTS = Object.keys(FIELD_CHOICES);
 
 // A lookup is a field name with an optional __operator suffix.
 const splitLookup = (lookup) => {
@@ -471,11 +566,28 @@ export default {
       return Object.entries(offered)
         .map(([name, meta]) => {
           const resource = Resource.find(name);
+          const declared =
+            meta && meta.fields && typeof meta.fields === "object" && !Array.isArray(meta.fields)
+              ? meta.fields
+              : {};
           return {
             name,
             label: (meta && meta.label) || (resource && resource.label) || name,
             conditional: !!(meta && meta.conditional),
-            actions: (meta && Array.isArray(meta.actions) && meta.actions) || [],
+            // An action is never named like the field overrides beside it.
+            actions: ((meta && Array.isArray(meta.actions) && meta.actions) || []).filter(
+              (action) => action && action.name !== FIELD_OVERRIDES
+            ),
+            // Fields a role may show, hide, open or lock; older runtimes send none.
+            fields: Object.entries(declared)
+              .map(([field, info]) => ({
+                name: field,
+                label: (info && info.label) || field,
+                read_only: !!(info && info.read_only),
+                write_only: !!(info && info.write_only),
+              }))
+              .sort((a, b) => a.label.localeCompare(b.label)),
+            labels: declared,
             icon: resource && resource.icon ? `mdi-${resource.icon}` : "mdi-table",
           };
         })
@@ -517,12 +629,16 @@ export default {
       return options;
     };
     const emit = (next) => {
-      // Drop resources that grant nothing so the stored map stays small.
+      // Drop resources that grant and override nothing so the stored map stays small.
       const cleaned = {};
       Object.entries(next).forEach(([name, rules]) => {
         const kept = {};
         Object.entries(rules || {}).forEach(([operation, value]) => {
-          if (value === true || (value && typeof value === "object")) {
+          if (operation === FIELD_OVERRIDES) {
+            if (value && typeof value === "object" && Object.keys(value).length) {
+              kept[operation] = value;
+            }
+          } else if (value === true || (value && typeof value === "object")) {
             kept[operation] = value;
           }
         });
@@ -692,10 +808,43 @@ export default {
         rawErrors.value = { ...rawErrors.value, [key]: error.message };
       }
     };
+    // Which resources show their field overrides; one with overrides starts open.
+    const open = ref({});
+    const fieldsOpen = (entry) =>
+      open.value[entry.name] === undefined
+        ? countOverrides(map.value[entry.name]) > 0 && !props.readonly
+        : open.value[entry.name];
+    const toggleFields = (name) => {
+      const entry = resources.value.find((item) => item.name === name);
+      open.value = { ...open.value, [name]: !(entry && fieldsOpen(entry)) };
+    };
+    const overrideCount = (entry) => countOverrides(map.value[entry.name]);
+    const overrideSummary = (entry) =>
+      describeFieldOverrides(map.value[entry.name], entry.labels);
+    const fieldChoice = (name, field, aspect) =>
+      storedChoice(fieldOverrides(map.value[name]), field, aspect);
+    const choiceOptions = (item, aspect) => fieldChoiceOptions(item, aspect);
+    const setFieldChoice = (name, field, aspect, choice) => {
+      const overrides = withFieldChoice(
+        fieldOverrides(map.value[name]),
+        field,
+        aspect,
+        choice
+      );
+      setRule(name, FIELD_OVERRIDES, Object.keys(overrides).length ? overrides : undefined);
+    };
     return {
       OPERATIONS,
+      ASPECTS,
       USER_ID,
       resources,
+      fieldsOpen,
+      toggleFields,
+      overrideCount,
+      overrideSummary,
+      fieldChoice,
+      choiceOptions,
+      setFieldChoice,
       granted,
       operationsOf,
       operationLabel,
@@ -731,6 +880,8 @@ export default {
 <style lang="scss">
 .PermissionsEditor {
   width: 100%;
+  // Sizes the fields panel to the editor's visible width.
+  container-type: inline-size;
   // The detail view enlarges values for the focused field; a matrix reads at one size.
   font-size: 13px;
   line-height: 1.4;
@@ -816,6 +967,89 @@ export default {
     font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
+  }
+  .PermissionsEditor__fields-row td {
+    padding: 2px 8px 6px 28px;
+    border-bottom-style: dashed;
+  }
+  .PermissionsEditor__fields-panel {
+    position: sticky;
+    left: 0;
+    max-width: calc(100vw - 96px);
+    // The visible width less the row's padding.
+    max-width: calc(100cqw - 36px);
+  }
+  .PermissionsEditor__fields-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    .q-btn {
+      font-size: 12px;
+      opacity: 0.85;
+      flex: none;
+    }
+  }
+  .PermissionsEditor__fields-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    opacity: 0.7;
+    cursor: pointer;
+  }
+  .PermissionsEditor__fields {
+    padding: 2px 0 4px 8px;
+  }
+  .PermissionsEditor__fields-note {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 6px;
+  }
+  .PermissionsEditor__field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 16px;
+    border-bottom: 1px solid rgba(128, 160, 144, 0.12);
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+  .PermissionsEditor__field-label {
+    flex: 1 1 140px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .PermissionsEditor__choice {
+    flex: 0 0 168px;
+    .q-field__native,
+    .q-field__control {
+      min-height: 32px;
+    }
+    .PermissionsEditor__value {
+      opacity: 0.6;
+    }
+    &.overridden .PermissionsEditor__value {
+      opacity: 1;
+      color: var(--q-primary);
+    }
+  }
+  // On a phone each field's name sits above its two choices.
+  @media (max-width: 599px) {
+    .PermissionsEditor__field {
+      padding-top: 4px;
+    }
+    .PermissionsEditor__field-label {
+      flex-basis: 100%;
+    }
+    .PermissionsEditor__choice {
+      flex: 1 1 120px;
+    }
   }
   .PermissionsEditor__value {
     display: inline-flex;
