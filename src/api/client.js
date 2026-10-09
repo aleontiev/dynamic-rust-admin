@@ -277,10 +277,23 @@ function processError(error) {
   if (Array.isArray(data) && data.length) {
     return Promise.reject({ error: data[0], response });
   }
-  if (typeof data === "object" && Object.keys(data).length) {
+  // Dynamic Rust says what went wrong as `{"detail": "..."}`, or for bad input
+  // `{"detail": {"<field>": ["..."]}}`: its message, or its fields' messages.
+  const detail =
+    typeof data === "object" && Object.keys(data).length === 1
+      ? data.detail
+      : undefined;
+  if (typeof detail === "string" && detail) {
+    return Promise.reject({ error: detail, response });
+  }
+  const body =
+    detail && typeof detail === "object" && !Array.isArray(detail)
+      ? detail
+      : data;
+  if (typeof body === "object" && Object.keys(body).length) {
     let errors = {};
     let error = null;
-    for (const [name, e] of Object.entries(data)) {
+    for (const [name, e] of Object.entries(body)) {
       if (name === "error") {
         error = e;
       } else {
