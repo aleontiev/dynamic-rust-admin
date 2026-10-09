@@ -21,5 +21,8 @@ The optional S3 adapter uses credentials supplied by the host API.
 This is a library, not a hosted backend or a standalone application. Git is the
 current distribution source; no npm registry release is implied. Use Node 22,
 install dependencies with `yarn install --frozen-lockfile`, and run `yarn lint`.
+`node tests/build-host.cjs` builds the admin inside a throwaway Quasar host, and
+`node tests/file-fields.cjs` drives it in Chromium through Playwright
+(`PLAYWRIGHT_MODULE` points at one installed elsewhere).
 
 MIT license. Author: alonetiev@gmail.com.

@@ -98,6 +98,16 @@
           :editable="!readonly"
         />
       </div>
+      <div v-else-if="field.type === 'file'" class="FieldInput__file">
+        <FileFieldInput
+          :value="live"
+          :field="field"
+          :resource="resource"
+          :readonly="readonly"
+          :dark="dark"
+          @update="live = $event"
+        />
+      </div>
       <div v-else-if="choices.length" class="FieldInput__choices">
         <q-select
           behavior="menu"
@@ -342,12 +352,14 @@ import "@vueup/vue-quill/dist/vue-quill.snow.css";
 import VuePdfEmbed from "vue-pdf-embed";
 import FilterList from "./FilterList";
 import PermissionsEditor from "./PermissionsEditor";
+import FileFieldInput from "./FileFieldInput.vue";
 
 export default {
   components: {
     VuePdfEmbed,
     FilterList,
     PermissionsEditor,
+    FileFieldInput,
     VideoPlayer,
     QuillEditor,
   },

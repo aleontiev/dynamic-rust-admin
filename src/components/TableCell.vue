@@ -15,6 +15,12 @@
         <PageLink :resource="resource" :field="props.col.name" :record="record" v-for="relation in resource.getValue(record, props.col.name, 1)" :relation="relation" :key="relation.id" classNames="col-xs-10 display-block"/>
         <span style="text-align: center" class="col-xs-2" v-if="resource.getValue(record, props.col.name).length > 0" v-text="'(' + resource.getValue(record, props.col.name).length + ')'"/>
       </div>
+      <FileValue
+        v-else-if="props.col.type === 'file'"
+        :value="mediaValue"
+        :dark="$q.dark.isActive"
+        compact
+      />
       <MediaPreview
         v-else-if="isMediaField"
         :value="mediaValue"
@@ -34,13 +40,15 @@
 import { computed } from 'vue';
 import PageLink from './PageLink';
 import MediaPreview from './MediaPreview';
+import FileValue from './FileValue.vue';
 
 export default {
   props: ['props', 'record', 'resource', 'dense', 'skeleton'],
   emits: ['click'],
   components: {
     PageLink,
-    MediaPreview
+    MediaPreview,
+    FileValue
   },
   setup (props, context) {
     const onClick = (index, col) => {

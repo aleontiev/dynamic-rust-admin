@@ -31,6 +31,9 @@
     </div>
     <span v-if="!permissionLines.length" class="text-grey">No access</span>
   </div>
+  <div v-else-if="field.type === 'file'">
+    <FileValue :value="value" :dark="dark" />
+  </div>
   <div v-else-if="isMediaField">
     <MediaPreview
       :value="value"
@@ -63,6 +66,7 @@ import { FIELD_OVERRIDES, describeFieldOverrides } from '../utilities/permission
 import PageLink from './PageLink';
 import ApexCharts from 'vue3-apexcharts';
 import MediaPreview from './MediaPreview';
+import FileValue from './FileValue.vue';
 
 const cache = ref({});
 export default {
@@ -70,7 +74,8 @@ export default {
   components: {
     apexchart: ApexCharts,
     PageLink,
-    MediaPreview
+    MediaPreview,
+    FileValue
   },
   setup(props) {
     const quasar = useQuasar();

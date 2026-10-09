@@ -19,6 +19,7 @@ import YAML from "json-to-pretty-yaml";
 import api from "../api";
 import { API_URL, resolveApiUrl } from "../config";
 import { uploadFile } from "../api/aws";
+import { uploadsFinished } from "../api/files";
 
 const YAMLIFY = false;
 const isPlainObject = (value) =>
@@ -373,6 +374,8 @@ class Resource extends Model {
   async postAPI({ id, field, data, signal = null }) {
     const endpoint =
       id && field ? `${this.name}/${id}/${field}` : `${this.name}`;
+    // A file field holds an upload whose bytes may still be on their way.
+    await uploadsFinished();
     const uploadPromises = [];
     const updatedData = { ...data };
     const keys = [];
@@ -448,6 +451,8 @@ class Resource extends Model {
     signal = null,
   }) {
     const endpoint = `${this.name}/${id}`;
+    // A file field holds an upload whose bytes may still be on their way.
+    await uploadsFinished();
     const data = translateChangesToAPI(changes);
     const uploadPromises = [];
     const updatedData = { ...data };
@@ -1533,6 +1538,10 @@ class Resource extends Model {
           result = value
             ? Resource.find(value)?.label.replace("_", " ") || value
             : null;
+          break;
+        case "file":
+          // A file is shown, copied and exported by its name.
+          result = value && typeof value === "object" ? value.name || "" : value;
           break;
         default:
           result = value;
